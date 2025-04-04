@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Anime Hub</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <link rel="icon" type="image/png" href="/logo.png">
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f4;
+      color: #333;
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      transition: background-image 0.5s ease-in-out;
+    }
+    body::before {
+      content: "";
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      z-index: -1;
+    }
+    .search-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      text-align: center;
+    }
+    .search-box {
+      max-width: 600px;
+      width: 90%;
+      padding: 10px 20px;
+      font-size: 1.2rem;
+      border-radius: 30px;
+      border: 1px solid #ccc;
+      outline: none;
+    }
+    .results-container {
+      padding: 20px;
+      max-width: 1200px;
+      margin: auto;
+    }
+    .results-header {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+    .results-header h1 {
+      cursor: pointer;
+      color: #222;
+      text-decoration: underline;
+    }
+    #search-results {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 20px;
+    }
+    .anime-card {
+      display: flex;
+      flex-direction: column;
+      background: rgba(255,255,255,0.95);
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .anime-card img {
+      width: 100%;
+      height: 200px;
+      object-fit: cover;
+    }
+    .anime-card-info {
+      padding: 15px;
+      flex: 1;
+    }
+    .anime-card-info h3 {
+      margin: 0 0 10px;
+    }
+    .rating {
+      display: flex;
+      align-items: center;
+    }
+    .rating .fa-star, .rating .fa-star-half-alt {
+      color: gold;
+      margin-right: 5px;
+    }
+    #load-more {
+      display: block;
+      margin: 30px auto 0;
+      padding: 10px 20px;
+      font-size: 1rem;
+      border: none;
+      background-color: #333;
+      color: white;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .logo {
+      width: 300px;
+      margin: 0;
+      padding: 20px;
+    }
+    #back-home {
+        max-width: 100px;
+        cursor: pointer;
+    }
+    a {
+        text-decoration: none;
+        font-weight: 900;
+        color: blue;
+    }
+    @media (max-width: 768px) {
+      #search-results {
+        display: block;
+      }
+      .search-box {
+        margin: 0 150px;
+        width: 60vw;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="search-container" id="home-page">
+    <img src="/home.png" alt="Anime Hub" class="logo">
+    <input type="text" id="search-input" class="search-box" placeholder="Search for anime..." />
+  </div>
+
+  <div class="results-container" id="results-page" style="display: none;">
+    <div class="results-header">
+      <img src="/logo.png" alt="Anime Hub" id="back-home">
+      <input type="text" id="search-input-results" class="search-box" placeholder="Search again..." />
+    </div>
+    <div id="search-results"></div>
+    <button id="load-more" style="display: none;">Load More</button>
+  </div>
+
+  <script>
+    const searchInput = document.getElementById('search-input');
+    const searchInputResults = document.getElementById('search-input-results');
+    const searchResults = document.getElementById('search-results');
+    const homePage = document.getElementById('home-page');
+    const resultsPage = document.getElementById('results-page');
+    const backHome = document.getElementById('back-home');
+    const loadMoreBtn = document.getElementById('load-more');
+
+    let lastRequestTime = 0;
+    const requestDelay = 350;
+    let currentPage = 1;
+    let currentQuery = '';
+
+    searchInput.addEventListener('keypress', async function (e) {
+      if (e.key === 'Enter') {
+        currentQuery = searchInput.value.trim();
+        if (!currentQuery) return;
+
+        homePage.style.display = 'none';
+        resultsPage.style.display = 'block';
+        searchInputResults.value = currentQuery;
+        currentPage = 1;
+        await searchAnime(currentQuery, true);
+      }
+    });
+
+    searchInputResults.addEventListener('keypress', async function (e) {
+      if (e.key === 'Enter') {
+        currentQuery = searchInputResults.value.trim();
+        if (!currentQuery) return;
+
+        currentPage = 1;
+        await searchAnime(currentQuery, true);
+      }
+    });
+
+    backHome.addEventListener('click', () => {
+      resultsPage.style.display = 'none';
+      homePage.style.display = 'flex';
+      document.body.style.backgroundImage = '';
+    });
+
+    loadMoreBtn.addEventListener('click', async () => {
+      currentPage++;
+      await searchAnime(currentQuery, false);
+    });
+
+    async function searchAnime(query, reset = false) {
+      const now = Date.now();
+      if (now - lastRequestTime < requestDelay) {
+        await new Promise(resolve => setTimeout(resolve, requestDelay - (now - lastRequestTime)));
+      }
+      lastRequestTime = Date.now();
+
+      try {
+        if (reset) searchResults.innerHTML = '<div><i class="fas fa-spinner fa-spin"></i> Searching...</div>';
+        const response = await fetch(`https://api.jikan.moe/v4/anime?q=${encodeURIComponent(query)}&limit=10&page=${currentPage}`);
+        if (!response.ok) throw new Error('API request failed.');
+        const data = await response.json();
+        displayResults(data.data, reset);
+        loadMoreBtn.style.display = data.pagination.has_next_page ? 'block' : 'none';
+      } catch (err) {
+        console.error(err);
+        searchResults.innerHTML = '<div>Failed to load results. Please try again.</div>';
+      }
+    }
+
+    function displayResults(results, reset = false) {
+      if (!results || results.length === 0) {
+        searchResults.innerHTML = '<div>No anime found.</div>';
+        return;
+      }
+
+      if (reset && results[0]?.images?.jpg?.image_url) {
+        document.body.style.backgroundImage = `url('${results[0].images.jpg.image_url}')`;
+      }
+
+      const html = results.map(anime => `
+        <div class="anime-card">
+          <img src="${anime.images?.jpg?.image_url || 'images/default-anime.jpg'}" alt="${anime.title}" />
+          <div class="anime-card-info">
+            <h3>${anime.title}</h3>
+            <p>${anime.year ? `Year: ${anime.year}` : 'Year: N/A'}</p>
+            <p>${anime.episodes ? `Episodes: ${anime.episodes}` : 'Episodes: N/A'}</p>
+            <div class="rating">
+              ${generateStarRating(anime.score)}
+              <span>${anime.score ? anime.score.toFixed(1) : 'N/A'}/10</span>
+            </div>
+            <a href="${anime.url}" target="_blank">View on MAL</a>
+          </div>
+        </div>
+      `).join('');
+
+      if (reset) {
+        searchResults.innerHTML = html;
+      } else {
+        searchResults.insertAdjacentHTML('beforeend', html);
+      }
+    }
+
+    function generateStarRating(score) {
+      if (!score) return '<span>No rating</span>';
+
+      const fullStars = Math.floor(score / 2);
+      const halfStar = score % 2 >= 0.5 ? 1 : 0;
+      const emptyStars = 5 - fullStars - halfStar;
+
+      return `
+        ${'<i class="fa fa-star"></i>'.repeat(fullStars)}
+        ${halfStar ? '<i class="fa fa-star-half-alt"></i>' : ''}
+        ${'<i class="far fa-star"></i>'.repeat(emptyStars)}
+      `;
+    }
+  </script>
+</body>
+</html>
